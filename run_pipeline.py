@@ -31,43 +31,8 @@ system.clk_domain.voltage_domain = VoltageDomain()
 system.mem_mode = "timing"
 system.mem_ranges = [AddrRange("8192MB")]
 
-# CPU configuration (using X86TimingSimpleCPU for X86 arch) and Memory bus
-system.cpu = X86O3CPU()
+system.cpu = [X86O3CPU(cpu_id=i) for i in range(4)]
 system.membus = SystemXBar()
-
-# Set number of issue and dispatch width (e.g., 4 instructions per cycle)
-system.cpu.issueWidth = 4
-system.cpu.dispatchWidth = 4
-system.cpu.commitWidth = 4
-system.cpu.fetchWidth = 4
-
-# Adding a branch predictor (e.g., BiModeBP or LocalBP)
-system.cpu.branchPred = BiModeBP()
-system.cpu.branchPred.numThreads = 128
-
-# Create cache and connect it to the System CPU
-system.cpu.icache = L1ICache(options)
-system.cpu.dcache = L1DCache(options)
-
-system.cpu.icache.connectCPU(system.cpu)
-system.cpu.dcache.connectCPU(system.cpu)
-
-# Create an L2 bus to connect L1 caches to the L2 cache
-system.l2bus = L2XBar()
-
-system.cpu.icache.connectBus(system.l2bus)
-system.cpu.dcache.connectBus(system.l2bus)
-
-# Create L2 cache and connect it to the L2 bus and the memory bus.
-system.l2cache = L2Cache(options)
-system.l2cache.connectCPUSideBus(system.l2bus)
-system.l2cache.connectMemSideBus(system.membus)
-
-# Connecting PIO and interrupt port to membus (Necessary for X86)
-system.cpu.createInterruptController()
-system.cpu.interrupts[0].pio = system.membus.mem_side_ports
-system.cpu.interrupts[0].int_requestor = system.membus.cpu_side_ports
-system.cpu.interrupts[0].int_responder = system.membus.mem_side_ports
 
 # Connect the system up to the membus
 system.system_port = system.membus.cpu_side_ports
@@ -85,13 +50,40 @@ else:
 
 # Setting up workload
 system.workload = SEWorkload.init_compatible(binary)
-process = Process()
-process.cmd = [binary]
-system.cpu.workload = process
-system.cpu.createThreads()
+
+process = Process(executable=binary, cmd = [binary, 4])
 
 # Simulation Configuration
 root = Root(full_system=False, system=system)
+for cpu in root.system.cpu:
+    cpu.workload = process
+    cpu.createThreads()
+    cpu.createInterruptController()
+    cpu.interrupts[0].pio = root.system.membus.mem_side_ports
+    cpu.interrupts[0].int_requestor = root.system.membus.cpu_side_ports
+    cpu.interrupts[0].int_responder = root.system.membus.mem_side_ports
+
+    # Create a memory bus, a coherent crossbar, in this case
+    cpu.l2bus = L2XBar()
+
+    # Create an L1 instruction and data cache
+    cpu.icache = L1ICache()
+    cpu.dcache = L1DCache()
+
+    # Connect the instruction and data caches to the CPU
+    cpu.icache.connectCPU(cpu)
+    cpu.dcache.connectCPU(cpu)
+
+    # Hook the CPU ports up to the l2bus
+    cpu.icache.connectBus(cpu.l2bus)
+    cpu.dcache.connectBus(cpu.l2bus)
+
+    # Create an L2 cache and connect it to the l2bus
+    cpu.l2cache = L2Cache()
+    cpu.l2cache.connectCPUSideBus(cpu.l2bus)
+
+    # Connect the L2 cache to the L3 bus
+    cpu.l2cache.connectMemSideBus(root.system.membus)
 
 m5.instantiate()
 
