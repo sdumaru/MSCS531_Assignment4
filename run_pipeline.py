@@ -32,8 +32,14 @@ system.mem_mode = "timing"
 system.mem_ranges = [AddrRange("8192MB")]
 
 # CPU configuration (using X86TimingSimpleCPU for X86 arch) and Memory bus
-system.cpu = X86TimingSimpleCPU()
+system.cpu = X86O3CPU()
 system.membus = SystemXBar()
+
+# Set number of issue and dispatch width (e.g., 4 instructions per cycle)
+system.cpu.issueWidth = 4
+system.cpu.dispatchWidth = 4
+system.cpu.commitWidth = 4
+system.cpu.fetchWidth = 4
 
 # Adding a branch predictor (e.g., BiModeBP or LocalBP)
 system.cpu.branchPred = BiModeBP()
