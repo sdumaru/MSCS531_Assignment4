@@ -35,6 +35,10 @@ system.mem_ranges = [AddrRange("8192MB")]
 system.cpu = X86TimingSimpleCPU()
 system.membus = SystemXBar()
 
+# Adding a branch predictor (e.g., BiModeBP or LocalBP)
+system.cpu.branchPred = BiModeBP()
+system.cpu.branchPred.numThreads = 128
+
 # Create cache and connect it to the System CPU
 system.cpu.icache = L1ICache(options)
 system.cpu.dcache = L1DCache(options)
